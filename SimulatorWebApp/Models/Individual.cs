@@ -4,9 +4,9 @@ namespace SimulatorWebApp.Models
 {
     public class Individual
     {
-        public readonly int memoryLength;
-        public readonly double moodThreshold;
-        public readonly double[,,] weights;
+        public int memoryLength { get; set; }
+        public double moodThreshold { get; set; }
+        public double[,,] weights { get; set; }
 
         public Individual(int memoryLength, double moodThreshold, double[,,] weights)
         {
