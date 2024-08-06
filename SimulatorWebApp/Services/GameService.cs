@@ -4,17 +4,17 @@ namespace SimulatorWebApp.Services
 {
     public class GameService
     {
-        private int popultionSize = 100;
-        private int roundsPerGeneration = 100;
-        private int roundLength = 500;
+        private readonly int popultionSize = 100;
+        private readonly int roundsPerGeneration = 100;
+        private readonly int roundLength = 500;
 
-        private int tournamentSize = 10;
-        private double crossoverD = .25;
+        private readonly int tournamentSize = 10;
+        private readonly double crossoverD = .25;
 
-        private int coopVal = 3;
-        private int defectWinVal = 5;
-        private int defectLossVal = 0;
-        private int doubleDefectVal = 1;
+        private readonly int coopVal = 3;
+        private readonly int defectWinVal = 5;
+        private readonly int defectLossVal = 0;
+        private readonly int doubleDefectVal = 1;
 
         public GameService()
         {
@@ -60,11 +60,29 @@ namespace SimulatorWebApp.Services
             return (player1Score, player2Score);
         }
 
-        private List<Individual> Tournament(List<(Individual, int)> population)
+        public List<(Individual, int)> EvaluateGeneration(List<Individual> population)
         {
             Random rng = new();
-            population = population.OrderBy(_ => rng.Next()).ToList();
-            List<List<(Individual, int)>> tournamentPopulations = new();
+            List<int> results = [.. Enumerable.Repeat(0, popultionSize)];
+            for (int round = 0; round < roundsPerGeneration; round++)
+            {
+                List<int[]> matchups = [.. Enumerable.Range(0, popultionSize).OrderBy(_ => rng.Next()).Chunk(2)];
+                List<(int, int)> roundResults = [.. matchups.AsParallel().Select(ids => PlayMatch(population[ids[0]], population[ids[1]]))];
+                for (int i = 0; i < matchups.Count; i++)
+                {
+                    results[matchups[i][0]] += roundResults[i].Item1;
+                    results[matchups[i][1]] += roundResults[i].Item2;
+                }
+            }
+            return [.. Enumerable.Range(0, popultionSize)
+                .Select(i => (population[i], results[i]))];
+        }
+
+        private List<Individual> Tournament(List<(Individual, int)> population, Random? rng = null)
+        {
+            rng ??= new Random();
+            population = [.. population.OrderBy(_ => rng.Next())];
+            List<List<(Individual, int)>> tournamentPopulations = [];
             var reproducingPopulation = Enumerable.Range(0, population.Count).AsParallel().Select(i =>
             {
                 List<(Individual, int)> tournamentPopulation;
@@ -79,21 +97,24 @@ namespace SimulatorWebApp.Services
                 }
                 return tournamentPopulation.MaxBy(individual => individual.Item2).Item1;
             }).OrderBy(_ => rng.Next()).ToList();
-            return Enumerable.Range(0, population.Count).AsParallel().Select(i => Crossover(reproducingPopulation[i], reproducingPopulation[i < population.Count - 1 ? i + 1 : 0])).AsSequential().OrderBy(_ => rng.Next()).ToList();
+            return [.. Enumerable.Range(0, population.Count).AsParallel()
+                .Select(i => Crossover(reproducingPopulation[i], reproducingPopulation[i < population.Count - 1 ? i + 1 : 0], rng))
+                .AsSequential()
+                .OrderBy(_ => rng.Next())];
         }
 
-        private Individual Crossover(Individual parent1, Individual parent2)
+        private Individual Crossover(Individual parent1, Individual parent2, Random? rng = null)
         {
-            Random rng = new();
-            var childMoodThreshold = Crossover(parent1.moodThreshold, parent2.moodThreshold, rng);
-            var childMemoryLength = Crossover(parent1.memoryLength, parent2.memoryLength, rng);
-            var childWeights = CrossoverMemory(childMemoryLength, parent1.weights, parent2.weights, rng);
+            rng ??= new Random();
+            var childMoodThreshold = Crossover(parent1.MoodThreshold, parent2.MoodThreshold, rng);
+            var childMemoryLength = Crossover(parent1.MemoryLength, parent2.MemoryLength, rng);
+            var childWeights = CrossoverMemory(childMemoryLength, parent1.Weights, parent2.Weights, rng);
             return new Individual(childMemoryLength, childMoodThreshold, childWeights);
         }
 
         private double Crossover(double a, double b, Random? rng = null)
         {
-            if (rng == null) rng = new Random();
+            rng ??= new Random();
             var beta = rng.NextDouble() * (1 + 2 * crossoverD) - crossoverD;
             return a * beta + b * (1 - beta);
         }
@@ -105,7 +126,7 @@ namespace SimulatorWebApp.Services
 
         private double[,,] CrossoverMemory(int memoryLength, double[,,] a, double[,,] b, Random? rng = null)
         {
-            if (rng == null) rng = new Random();
+            rng ??= new Random();
             var dims = Enumerable.Range(0, a.Rank).Select(i => a.GetLength(i)).ToArray();
             var newVal = new double[memoryLength, 2, 2];
             for (int i = 0; i < newVal.GetLength(0); i++)
