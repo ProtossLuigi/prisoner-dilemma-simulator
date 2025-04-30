@@ -28,7 +28,7 @@ namespace SimulatorWebApp.Services
             int player2Score = 0;
             for (int i = 0; i < roundLength; i++)
             {
-                gameState.Insert(0, (player1.Act(gameState), player2.Act(gameState)));
+                gameState.Insert(0, (player1.Act(gameState, 0), player2.Act(gameState, 1)));
 
                 if (gameState[0].Item1)
                 {
